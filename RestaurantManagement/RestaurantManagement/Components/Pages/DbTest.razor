@@ -1,0 +1,96 @@
+@page "/dbtest"
+@using RestaurantManagement.Data
+@using RestaurantManagement.Models
+@using Microsoft.EntityFrameworkCore
+@inject RestaurantDbContext DbContext
+
+<h1>Menümüz</h1>
+
+@if (categories != null)
+{
+    @foreach (var category in categories)
+    {
+        <div class="category-section">
+            <h2 class="bg-dark text-white p-3">@category.Name</h2>
+
+            <div class="row">
+                @foreach (var menuItem in menuItems.Where(m => m.SubCategories.MainCategoryID == category.ID))
+                {
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">@menuItem.Name</h5>
+                                <p class="card-text">@menuItem.Description</p>
+                                <p class="card-text text-primary">₺@menuItem.Price.ToString("F2")</p>
+                                <div class="d-flex align-items-center">
+                                    <input type="number" class="form-control me-2" style="width: 100px"
+                                           @bind="@quantityMap[menuItem.ID]" min="1" />
+                                    @if (menuItem.IsAvailable)
+                                    {
+                                        <button class="btn btn-success" @onclick="() => AddToOrder(menuItem)">
+                                            Sipariş Ver
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-danger">Mevcut Değil</span>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<MainCategories> categories;
+    private List<MenuItems> menuItems;
+    private Dictionary<int, int> quantityMap = new();
+    private int currentOrderId = 1; // Bu değeri gerçek order ID'ye göre ayarlamanız gerekecek
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Ana kategorileri yükle
+        categories = await DbContext.MainCategories.ToListAsync();
+
+        // Menü öğelerini alt kategorileriyle birlikte yükle
+        menuItems = await DbContext.MenuItems
+            .Include(m => m.SubCategories)
+            .ThenInclude(s => s.MainCategories)
+            .ToListAsync();
+
+        // Quantity map'i başlat
+        foreach (var item in menuItems)
+        {
+            quantityMap[item.ID] = 1;
+        }
+    }
+
+    private async Task AddToOrder(MenuItems menuItem)
+    {
+        try
+        {
+            var quantity = quantityMap[menuItem.ID];
+            var orderItem = new OrderItems
+            {
+                OrderID = currentOrderId,
+                MenuItemID = menuItem.ID,
+                Quantity = quantity,
+                UnitPrice = menuItem.Price
+            };
+
+            await DbContext.OrderItems.AddAsync(orderItem);
+            await DbContext.SaveChangesAsync();
+
+            // Başarılı mesajı gösterilebilir
+        }
+        catch (Exception ex)
+        {
+            // Hata mesajı gösterilebilir
+            Console.WriteLine(ex.Message);
+        }
+    }
+}

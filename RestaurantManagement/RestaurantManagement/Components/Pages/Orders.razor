@@ -1,0 +1,74 @@
+@page "/orders"
+@using RestaurantManagement.Data
+@using RestaurantManagement.Models
+@using Microsoft.EntityFrameworkCore
+@inject RestaurantDbContext DbContext
+
+<div class="container mt-4">
+    <h3>Siparişler</h3>
+
+    @if (ordersList == null)
+    {
+        <div class="text-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Yükleniyor...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        @foreach (var order in ordersList)
+        {
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Sipariş #@order.ID</h5>
+                        <small class="text-muted">Masa: @order.TableID</small>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Ürün</th>
+                                <th>Adet</th>
+                                <th>Birim Fiyat</th>
+                                <th>Toplam</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in order.OrderItems)
+                            {
+                                <tr>
+                                    <td>@(item.MenuItems?.Name ?? "N/A")</td>
+                                    <td>@item.Quantity</td>
+                                    <td>@item.UnitPrice.ToString("C2")</td>
+                                    <td>@((item.Quantity * item.UnitPrice).ToString("C2"))</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end"><strong>Toplam:</strong></td>
+                                <td><strong>@order.TotalAmount.ToString("C2")</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<Models.Orders>? ordersList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ordersList = await DbContext.Orders
+            .Include(o => o.OrderItems)
+                .ThenInclude(oi => oi.MenuItems)
+            .OrderByDescending(o => o.ID)
+            .ToListAsync();
+    }
+}
